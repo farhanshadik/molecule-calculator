@@ -100,6 +100,13 @@ header p{margin:6px auto 0;color:var(--mut);max-width:780px;font-size:15px}
 .viz svg{display:block;width:100%;height:auto;max-height:480px}
 .viz canvas{display:block;width:100%;aspect-ratio:1/1;max-height:480px;cursor:grab;touch-action:none}
 .viz canvas:active{cursor:grabbing}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}
+.th{background:#0b1230;border:1px solid var(--line);border-radius:12px;padding:6px;color:var(--tx);cursor:pointer;font:500 13px "Hind Siliguri",sans-serif}
+.th canvas{width:100%;aspect-ratio:1/1;display:block;border-radius:8px}
+.th span{display:flex;justify-content:space-between;margin-top:3px}
+.th b{color:var(--acc);font-weight:500}
+.th:hover{border-color:var(--acc2)}
+.th.cur{border-color:var(--acc);box-shadow:0 0 0 2px rgba(94,200,255,.25)}
 .legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .lg{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;border:1px solid var(--line);background:#0c1330;border-radius:999px;padding:3px 10px;color:#d3dcf7;cursor:default}
 .lg.btnlike{cursor:pointer}
@@ -192,7 +199,7 @@ footer{margin-top:26px;text-align:center;color:var(--mut);font-size:13px}
 
 <footer>
   ডেটা মূলত IUPAC/NIST-এর সর্বজনস্বীকৃত মান থেকে নেওয়া সংক্ষিপ্ত সারণি; ১০৯–১১৮ নম্বর মৌলের গুণাবলি তাত্ত্বিক পূর্বাভাস। আইসোটোপের অস্তিত্ব "জানা পরিসর"-এর ভিত্তিতে আনুমানিকভাবে যাচাই করা হয়েছে।
-  শিক্ষামূলক ব্যবহারের জন্য তৈরি — গবেষণার কাজে মূল সূত্র মিলিয়ে নিন।
+  <b>সংস্করণ ২.৩ (1s বিপরীত পাশে)</b> · শিক্ষামূলক ব্যবহারের জন্য তৈরি — গবেষণার কাজে মূল সূত্র মিলিয়ে নিন।
 </footer>
 </div>
 
@@ -668,11 +675,16 @@ function bohrSVG(p,n,shells,hexcol){
     const r1=rN+22,step=k>1?Math.min(42,(190-r1)/(k-1)):0;
     for(let i=0;i<k;i++){
       const r=r1+i*step,cnt=shells[i];
-      const er=cnt>32?2.3:cnt>18?2.9:cnt>8?3.5:4.2;
+      const er=cnt>32?2.6:cnt>18?3.0:3.5;
+      /* ইলেকট্রন জোড়ায় জোড়ায় (↑↓) — প্রতি জোড়ায় দুটি কাছাকাছি, জোড়াগুলো সমান দূরত্বে */
+      const pairs=Math.ceil(cnt/2),dl=Math.min(5.4/r,Math.PI/pairs*0.38);
+      const off=i%2?Math.PI/(2*pairs):0;
       let el="";
       for(let j=0;j<cnt;j++){
-        const a=2*Math.PI*j/cnt;
-        el+=`<circle cx="${(c+r*Math.cos(a)).toFixed(1)}" cy="${(c+r*Math.sin(a)).toFixed(1)}" r="${er}" fill="#4cc3ff" filter="url(#glow)"/>`;
+        const pj=j>>1,second=j&1;
+        /* ব্যতিক্রম: ১ম কক্ষ (1s, গোলাকার) — দুটি ইলেকট্রন নিউক্লিয়াসের বিপরীত দুই পাশে */
+        const a=i===0?2*Math.PI*j/cnt:2*Math.PI*pj/pairs+off+(second?dl:-dl)*(cnt-pj*2>=2?1:0);
+        el+=`<circle cx="${(c+r*Math.cos(a)).toFixed(1)}" cy="${(c+r*Math.sin(a)).toFixed(1)}" r="${er}" fill="${i===0||cnt-pj*2>=2?"#4cc3ff":"#ffd166"}" filter="url(#glow)"/>`;
       }
       const dur=5+i*3.2,dir=i%2?"-360":"360";
       rings+=`<circle cx="${c}" cy="${c}" r="${r.toFixed(1)}" fill="none" stroke="#4a5a9a" stroke-width="1" stroke-dasharray="3 4"/>`+
@@ -691,87 +703,130 @@ const ANGF={
   2:[(x,y)=>x*y,(x,y,z)=>y*z,(x,y,z)=>x*z,(x,y)=>x*x-y*y,(x,y,z)=>3*z*z-1],
   3:[(x,y,z)=>z*(5*z*z-3),(x,y,z)=>x*(5*z*z-1),(x,y,z)=>y*(5*z*z-1),(x,y,z)=>z*(x*x-y*y),(x,y,z)=>x*y*z,(x,y)=>x*(x*x-3*y*y),(x,y)=>y*(3*x*x-y*y)]
 };
+const ANAME={0:[""],1:["x","y","z"],2:["xy","yz","xz","x²−y²","z²"],3:["z³","xz²","yz²","z(x²−y²)","xyz","x(x²−3y²)","y(3x²−y²)"]};
+const SHAPE={0:"গোলাকার",1:"ডাম্বেল-আকৃতি (২টি লোব)",2:"চার-পাপড়ি আকৃতি (৪টি লোব)",3:"জটিল বহু-লোব আকৃতি"};
+const Rn=n=>Math.pow(n,1.3);
 const AMAX={};
-function randDir(){let x=gauss(),y=gauss(),z=gauss();const m=Math.hypot(x,y,z)||1;return[x/m,y/m,z/m];}
 function gauss(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function randDir(){let x=gauss(),y=gauss(),z=gauss();const m=Math.hypot(x,y,z)||1;return[x/m,y/m,z/m];}
 for(let l=0;l<=3;l++){AMAX[l]=ANGF[l].map(f=>{let m=0;for(let i=0;i<4000;i++){const d=randDir(),v=f(d[0],d[1],d[2]);m=Math.max(m,v*v);}return m*1.05||1;});}
 function sampleDir(l,m){
   const f=ANGF[l][m],mx=AMAX[l][m];
-  for(let t=0;t<400;t++){const d=randDir(),v=f(d[0],d[1],d[2]);if(Math.random()*mx<=v*v)return d;}
+  for(let t=0;t<400;t++){const d=randDir(),v=f(d[0],d[1],d[2]);if(Math.random()*mx*mx<=v*v*v*v)return d;} /* |ψ|²-এর চেয়ে একটু তীক্ষ্ণ — আকার স্পষ্ট দেখানোর জন্য */
   return randDir();
 }
-const Q={pts:[],visible:{},keys:[],rx:-0.45,ry:0.6,auto:true,drag:false,lx:0,ly:0,raf:0,cv:null,ctx:null,R:1,e:0};
+const Q={orbs:[],visible:{},keys:[],sel:-1,rx:-0.45,ry:0.6,auto:true,drag:false,lx:0,ly:0,raf:0,cv:null,thumbs:[],total:0};
+const PER_ORB=1200;
+/* প্রতিটি অরবিটাল আলাদা বিন্দু-মেঘ হিসেবে তৈরি (আকার + তরঙ্গের দশা-চিহ্ন সহ) */
 function buildCloud(cfg,e){
-  Q.pts=[];Q.keys=[];Q.e=e;
+  Q.orbs=[];Q.keys=[];Q.total=0;Q.sel=-1;
   const keys=BYN.filter(o=>cfg[o.key]>0);
   Q.keys=keys.map(o=>({key:o.key,n:o.n,l:o.l,cnt:cfg[o.key]}));
   if(!keys.length)return;
-  const per=Math.max(40,Math.min(700,Math.floor(5200/Math.max(e,1))));
   const nmax=Math.max(...keys.map(o=>o.n));
-  const Rn=n=>Math.pow(n,1.3);
-  Q.R=Rn(nmax)*1.28;
-  keys.forEach((o,si)=>{
-    const k=o.n-o.l,cnt=cfg[o.key],m=2*o.l+1;
-    const w=[],tw=[];let s=0;for(let j=1;j<=k;j++){s+=Math.pow(j,1.5);w.push(s);}
-    for(let i=0;i<cnt;i++){
-      const mi=i%m;
-      for(let t=0;t<per;t++){
+  Q.R=Rn(nmax)*1.4;
+  keys.forEach(o=>{
+    const cnt=cfg[o.key],m=2*o.l+1,k=o.n-o.l;
+    const w=[];let sum=0;for(let j=1;j<=k;j++){sum+=Math.pow(j,1.5);w.push(sum);}
+    for(let mi=0;mi<m;mi++){
+      const occ=(mi<cnt?1:0)+(cnt>m&&mi<cnt-m?1:0);
+      if(!occ)continue;
+      const N=PER_ORB*occ,pts=new Float32Array(N*4),f=ANGF[o.l][mi];
+      for(let t=0;t<N;t++){
         const d=sampleDir(o.l,mi);
-        const pick=Math.random()*s;let j=1;while(j<k&&pick>w[j-1])j++;
-        const ctr=Rn(o.n)*Math.pow(j/k,1.1),sg=0.11*Rn(o.n)*(k>1?0.8:1);
+        const pick=Math.random()*sum;let j=1;while(j<k&&pick>w[j-1])j++;
+        const ctr=Rn(o.n)*Math.pow(j/k,1.1),sg=0.075*Rn(o.n)*(k>1?0.8:1);
         const r=Math.abs(ctr+sg*gauss());
-        Q.pts.push([d[0]*r,d[1]*r,d[2]*r,si]);
+        let sign=f(d[0],d[1],d[2])>=0?1:-1;
+        if((k-j)%2)sign=-sign;
+        pts[t*4]=d[0]*r;pts[t*4+1]=d[1]*r;pts[t*4+2]=d[2]*r;pts[t*4+3]=sign;
       }
+      Q.orbs.push({key:o.key,n:o.n,l:o.l,mi,occ,N,pts,label:o.n+LET[o.l]+ANAME[o.l][mi]});
+      Q.total+=N;
     }
   });
-  Q.keys.forEach((k,i)=>{if(Q.visible[k.key]===undefined)Q.visible[k.key]=true;});
+  if(Q.visible===undefined)Q.visible={};
+  Q.keys.forEach(k=>{if(Q.visible[k.key]===undefined)Q.visible[k.key]=true;});
+  /* শুরুতে সর্বশেষ (যোজ্যতা) উপকক্ষের প্রথম অরবিটাল দেখাও — যাতে আসল আকার চোখে পড়ে */
+  let last=null;for(const o of ORDER){if(cfg[o.key]>0)last=o.key;}
+  Q.sel=Q.orbs.findIndex(x=>x.key===last);
 }
-function drawCloud(){
-  const cv=Q.cv,ctx=Q.ctx;if(!cv||!ctx)return;
+function hexA(hex,a){const n=parseInt(hex.slice(1),16);return`rgba(${n>>16},${(n>>8)&255},${n&255},${a})`;}
+function prep(cv){
+  const ctx=cv.__c||(cv.__c=cv.getContext?cv.getContext("2d"):null);
+  if(!ctx)return null;
   const dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;
-  if(!w)return;
-  if(cv.width!==Math.round(w*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);}
+  if(!w||!h)return null;
+  if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);}
   ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.globalCompositeOperation="source-over";
   ctx.fillStyle="#070c1d";ctx.fillRect(0,0,w,h);
-  const sc=(Math.min(w,h)/2*0.92)/Q.R,cx=w/2,cy=h/2;
-  const cX=Math.cos(Q.rx),sX=Math.sin(Q.rx),cY=Math.cos(Q.ry),sY=Math.sin(Q.ry);
-  ctx.globalCompositeOperation="lighter";
-  const vis=Q.keys.map(k=>Q.visible[k.key]!==false);
-  const sz=Math.max(1.4,Math.min(2.4,w/260));
-  for(let si=0;si<Q.keys.length;si++){
-    if(!vis[si])continue;
-    ctx.fillStyle=hexA(NCOL[Math.min(Q.keys[si].n,8)-1],0.55);
-    ctx.beginPath();
-    for(const p of Q.pts){
-      if(p[3]!==si)continue;
-      let x=p[0]*cY+p[2]*sY,z=-p[0]*sY+p[2]*cY,y=p[1];
-      const y2=y*cX-z*sX,z2=y*sX+z*cX;
-      const f=1/(1-z2*0.012/Q.R*Q.R*0.08);
-      ctx.rect(cx+x*sc*f-sz/2,cy+y2*sc*f-sz/2,sz,sz);
-    }
-    ctx.fill();
+  return{ctx,w,h};
+}
+function plot(ctx,o,stride,sg,cx,cy,sc,sz){
+  const cX=Math.cos(Q.rx),sX=Math.sin(Q.rx),cY=Math.cos(Q.ry),sY=Math.sin(Q.ry),pts=o.pts;
+  ctx.beginPath();
+  for(let i=0;i<o.N;i+=stride){
+    const q=i*4;if(sg!==0&&pts[q+3]!==sg)continue;
+    const px=pts[q],py=pts[q+1],pz=pts[q+2];
+    const x=px*cY+pz*sY,z=-px*sY+pz*cY,y2=py*cX-z*sX;
+    ctx.rect(cx+x*sc-sz/2,cy+y2*sc-sz/2,sz,sz);
   }
-  // নিউক্লিয়াস
-  const g=ctx.createRadialGradient(cx,cy,0,cx,cy,9);
+  ctx.fill();
+}
+function glow(ctx,cx,cy,r){
+  const g=ctx.createRadialGradient(cx,cy,0,cx,cy,r);
   g.addColorStop(0,"rgba(255,120,130,.95)");g.addColorStop(1,"rgba(255,120,130,0)");
-  ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,9,0,7);ctx.fill();
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.fill();
+}
+/* একটি অরবিটাল: ধনাত্মক দশা নীল, ঋণাত্মক দশা লাল */
+function paintOrb(cv,o,maxPts,sz,nuc){
+  const P=prep(cv);if(!P)return;
+  const {ctx,w,h}=P,sc=(Math.min(w,h)/2*0.9)/(Rn(o.n)*1.4),st=Math.max(1,Math.floor(o.N/maxPts));
+  ctx.globalCompositeOperation="lighter";
+  ctx.fillStyle="rgba(77,171,247,.65)";plot(ctx,o,st,1,w/2,h/2,sc,sz);
+  ctx.fillStyle="rgba(255,99,132,.65)";plot(ctx,o,st,-1,w/2,h/2,sc,sz);
+  if(nuc)glow(ctx,w/2,h/2,8);
   ctx.globalCompositeOperation="source-over";
 }
-function hexA(hex,a){const n=parseInt(hex.slice(1),16);return`rgba(${n>>16},${(n>>8)&255},${n&255},${a})`;}
+/* সব অরবিটাল একত্রে (উপকক্ষ অনুযায়ী রং) */
+function paintAll(cv){
+  const P=prep(cv);if(!P)return;
+  const {ctx,w,h}=P,sc=(Math.min(w,h)/2*0.92)/Q.R,st=Math.max(1,Math.round(Q.total/9000)),sz=Math.max(1.5,Math.min(2.6,w/240));
+  ctx.globalCompositeOperation="lighter";
+  for(const o of Q.orbs){
+    if(Q.visible[o.key]===false)continue;
+    ctx.fillStyle=hexA(NCOL[Math.min(o.n,8)-1],0.5);
+    plot(ctx,o,st,0,w/2,h/2,sc,sz);
+  }
+  glow(ctx,w/2,h/2,9);
+  ctx.globalCompositeOperation="source-over";
+}
 function loop(){
-  if(Q.auto&&!Q.drag)Q.ry+=0.006;
-  if(!document.hidden)drawCloud();
+  if(Q.auto&&!Q.drag)Q.ry+=0.008;
+  if(!document.hidden){
+    if(Q.cv){const o=Q.orbs[Q.sel];if(Q.sel>=0&&o)paintOrb(Q.cv,o,o.N,Math.max(1.8,Math.min(3,(Q.cv.clientWidth||400)/190)),true);else paintAll(Q.cv);}
+    for(let i=0;i<Q.thumbs.length;i++)if(Q.orbs[i])paintOrb(Q.thumbs[i],Q.orbs[i],380,1.6,false);
+  }
   Q.raf=requestAnimationFrame(loop);
 }
 function bindCanvas(cv){
-  Q.cv=cv;Q.ctx=cv.getContext?cv.getContext("2d"):null;
-  if(!Q.ctx)return;
-  cv.addEventListener("pointerdown",ev=>{Q.drag=true;Q.lx=ev.clientX;Q.ly=ev.clientY;try{cv.setPointerCapture(ev.pointerId);}catch(_){}} );
+  Q.cv=cv;
+  if(!cv.getContext||!cv.getContext("2d"))return;
+  cv.addEventListener("pointerdown",ev=>{Q.drag=true;Q.lx=ev.clientX;Q.ly=ev.clientY;try{cv.setPointerCapture(ev.pointerId);}catch(_){}});
   cv.addEventListener("pointermove",ev=>{if(!Q.drag)return;Q.ry+=(ev.clientX-Q.lx)*0.01;Q.rx+=(ev.clientY-Q.ly)*0.01;Q.rx=Math.max(-1.5,Math.min(1.5,Q.rx));Q.lx=ev.clientX;Q.ly=ev.clientY;});
   const up=()=>{Q.drag=false;};
   cv.addEventListener("pointerup",up);cv.addEventListener("pointercancel",up);cv.addEventListener("pointerleave",up);
   if(!Q.raf)Q.raf=requestAnimationFrame(loop);
+}
+function qInfoHTML(){
+  const o=Q.orbs[Q.sel];
+  if(Q.sel>=0&&o)return `এখন দেখছেন: <b>${o.label}</b> অরবিটাল — ${SHAPE[o.l]}${o.l===2&&o.mi===4?" (দুই লোব + মাঝে কোমরবন্ধ)":""} · ইলেকট্রন ${o.occ} (${o.occ===2?"↑↓ জোড়":"↑ অযুগ্ম"}) · <span style="color:#4dabf7">নীল</span> / <span style="color:#ff6384">লাল</span> = তরঙ্গফাংশনের ধনাত্মক / ঋণাত্মক দশা`;
+  return "এখন সব অরবিটাল একত্রে দেখছেন। পূর্ণ উপকক্ষ (যেমন p⁶, d¹⁰) একসাথে মিললে গোলাকার দেখায় — আলাদা আকার দেখতে নিচের অরবিটাল-তালিকা থেকে বেছে নিন।";
+}
+function thumbsHTML(){
+  if(!Q.orbs.length)return "<span class='note'>ইলেকট্রন নেই — দেখানোর মতো অরবিটাল নেই।</span>";
+  return Q.orbs.map((o,i)=>`<button class="th ${i===Q.sel?"cur":""}" data-oi="${i}" title="${o.label} — ${SHAPE[o.l]}"><canvas></canvas><span>${o.label}<b>${o.occ===2?"↑↓":"↑"}</b></span></button>`).join("");
 }
 
 /* ===================== অবস্থা ও ইনপুট ===================== */
@@ -816,6 +871,7 @@ function render(){
   }
   const el=r.el,cat=CAT[el.cat],A=r.A,Z=p;
   const cfg=configFor(p,e);
+  buildCloud(cfg,e);
   const shells=shellCounts(cfg);
   const pred=Z>=109;
   const per=period(Z),grp=group(Z),blk=blockOf(Z);
@@ -845,14 +901,19 @@ function render(){
         <span class="lg"><i style="background:var(--electron)"></i>ইলেকট্রন ${e}</span>
         ${shells.map((c,i)=>`<span class="lg">${SHELLN[i]} (n=${i+1}): ${c}</span>`).join("")}
       </div>
-      <p class="note">বোর মডেলে ইলেকট্রন নির্দিষ্ট বৃত্তাকার কক্ষপথে ঘোরে; প্রতিটি কক্ষে সর্বোচ্চ 2n² টি ইলেকট্রন থাকতে পারে। নিউক্লিয়াসের আকার ও কণার সংখ্যা চিত্রে আনুপাতিক নয় (বোঝার সুবিধার্থে)।</p>
+      <p class="note">বোর মডেলে ইলেকট্রন নির্দিষ্ট বৃত্তাকার কক্ষপথে ঘোরে; প্রতিটি কক্ষে সর্বোচ্চ 2n² টি ইলেকট্রন থাকতে পারে। ১ম কক্ষের (1s) ইলেকট্রন নিউক্লিয়াসের বিপরীত দুই পাশে থাকে, আর বাকি কক্ষে ইলেকট্রন জোড়ায় জোড়ায় (↑↓) আঁকা হয়েছে; কক্ষে ইলেকট্রন বিজোড় সংখ্যক হলে জোড় না পাওয়া একটি ইলেকট্রন হলুদ রঙে দেখানো (সঠিক অযুগ্ম-ইলেকট্রন সংখ্যা নিচের অরবিটাল ডায়াগ্রামে)। নিউক্লিয়াসের আকার ও কণার সংখ্যা চিত্রে আনুপাতিক নয় (বোঝার সুবিধার্থে)।</p>
     </div>
     <div class="card"><h2>🌫️ কোয়ান্টাম মডেল <small>— অরবিটাল ও সম্ভাবনা-মেঘ</small></h2>
       <div class="viz"><canvas id="qc"></canvas></div>
+      <div class="note" id="qinfo" style="margin:10px 0 0;color:#cfe0ff">${qInfoHTML()}</div>
       <div class="legend" id="qleg"></div>
-      <div class="vizctl"><button class="btn" id="qAuto">⏯️ ঘূর্ণন চালু/বন্ধ</button><button class="btn" id="qAll">👁️ সব দেখান</button></div>
-      <p class="note">প্রতিটি বিন্দু ইলেকট্রনের সম্ভাব্য অবস্থান। s গোলাকার, p ডাম্বেল-আকৃতির, d ও f জটিল পাপড়ি-আকৃতির। মাউস/আঙুল দিয়ে ঘুরিয়ে দেখুন; নিচের উপ-কক্ষের বোতামে চেপে আলাদা আলাদা অরবিটাল দেখা/লুকানো যায়। (চিত্রটি শিক্ষামূলক আনুমানিক রূপ।)</p>
-    </div></div>`;
+      <div class="vizctl"><button class="btn" id="qAuto">⏯️ ঘূর্ণন চালু/বন্ধ</button><button class="btn" id="qAll">👁️ সব অরবিটাল একত্রে</button></div>
+      <p class="note">প্রতিটি বিন্দু ইলেকট্রনের সম্ভাব্য অবস্থান। s গোলাকার, p ডাম্বেল-আকৃতির, d চার-পাপড়ি ও f আরও জটিল। মাউস/আঙুল দিয়ে ঘুরিয়ে দেখুন। (চিত্রটি শিক্ষামূলক আনুমানিক রূপ।)</p>
+    </div></div>
+    <div class="card" style="margin-top:14px"><h2>🔬 অরবিটালগুলো আলাদা করে <small>— চেপে বড় পর্দায় দেখুন</small></h2>
+      <div class="thumbs" id="thumbs">${thumbsHTML()}</div>
+      <p class="note">প্রতিটি ছোট ঘরে একটি অরবিটাল ও তার ইলেকট্রন (↑↓ = জোড়, ↑ = অযুগ্ম)। p-অরবিটাল তিনটি আলাদা অক্ষ বরাবর (x, y, z), d পাঁচটি, f সাতটি। হুন্ডের নিয়মে প্রথমে প্রতিটি অরবিটালে একটি করে ইলেকট্রন বসে, তারপর জোড় বাঁধে।</p>
+    </div>`;
 
   /* বিন্যাস */
   const unp=unpaired(cfg);
@@ -914,16 +975,26 @@ function render(){
   out.innerHTML=h;
 
   /* কোয়ান্টাম ক্যানভাস */
-  buildCloud(cfg,e);
+  Q.thumbs=[];
   const cv=$("#qc");
   if(cv){
     bindCanvas(cv);
-    const lg=$("#qleg");
+    const lg=$("#qleg"),info=$("#qinfo"),th=$("#thumbs");
+    const ths=Array.from(th.querySelectorAll(".th"));
+    Q.thumbs=Array.from(th.querySelectorAll("canvas"));
+    const sync=()=>{info.innerHTML=qInfoHTML();ths.forEach((b,i)=>b.classList.toggle("cur",i===Q.sel));};
+    ths.forEach(b=>b.addEventListener("click",()=>{Q.sel=+b.dataset.oi;sync();}));
     if(!Q.keys.length)lg.innerHTML=`<span class="note">ইলেকট্রন নেই — শুধু নিউক্লিয়াস।</span>`;
     else lg.innerHTML=Q.keys.map(k=>`<span class="lg btnlike ${Q.visible[k.key]===false?"off":""}" data-sub="${k.key}"><i style="background:${NCOL[k.n-1]}"></i>${k.key}<sup>${k.cnt}</sup></span>`).join("");
-    lg.querySelectorAll("[data-sub]").forEach(b=>b.addEventListener("click",()=>{const kk=b.dataset.sub;Q.visible[kk]=Q.visible[kk]===false;b.classList.toggle("off");}));
+    const chips=Array.from(lg.querySelectorAll("[data-sub]"));
+    chips.forEach(b=>b.addEventListener("click",()=>{
+      const kk=b.dataset.sub;
+      if(Q.sel>=0){const i=Q.orbs.findIndex(x=>x.key===kk);if(i>=0)Q.sel=i;}
+      else{Q.visible[kk]=Q.visible[kk]===false;b.classList.toggle("off");}
+      sync();
+    }));
     $("#qAuto").onclick=()=>{Q.auto=!Q.auto;};
-    $("#qAll").onclick=()=>{Q.keys.forEach(k=>Q.visible[k.key]=true);lg.querySelectorAll("[data-sub]").forEach(b=>b.classList.remove("off"));};
+    $("#qAll").onclick=()=>{Q.sel=-1;Q.keys.forEach(k=>Q.visible[k.key]=true);chips.forEach(b=>b.classList.remove("off"));sync();};
   }
   bindPT();
   out.querySelectorAll("[data-iso]").forEach(b=>b.addEventListener("click",()=>setState(S.p,+b.dataset.iso-S.p,S.e)));
